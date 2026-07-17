@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  gamh-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gamh-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

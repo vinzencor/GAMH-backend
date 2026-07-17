@@ -1,0 +1,119 @@
+name: Deploy GAMH Backend to AWS EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  APP_DIR: /home/ubuntu/GAMH-Backend
+  SERVICE_NAME: gamh-server
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (verify build)
+        run: npm ci
+
+      # ─── Deploy to EC2 via SSH ──────────────────────────────────────────
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 15.134.201.226
+          username: ubuntu
+          key: |
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEpQIBAAKCAQEAuC8wWij9hRsngAXwxDTQaO/n2dzRDwpsaQEi0K+wvBazM+Wl
+            6RxTrUOzVLdgiSwYOKmJ63IXnq1wCGAHN7xn53VWoUIhHguVikahGKDeXsN8GDzb
+            yVMqvicHkusKt9cdGTPWS7WJJAH35d+IUY2lVrg4MASpsGtJrzvtISmMdB75Z6Vu
+            15kfLll96vDCpDviMqkNa3Ib61b2VlyekyTHk8yzbTtsUmUXQ2KcEna1KGW9CDTQ
+            ksCWx8plHCNah1xzTQJwcsWfqh3vQNIf/2zESd7ye7kWoMUT3PQtQbLaV+8e5cnk
+            VIyG/HBJoQOxko1QeTwMGF7J6TLHu/1XFVPPHQIDAQABAoIBAQCnGwk/g9kgHtbj
+            rIAZQ+Gik6dDXri+cLKTQliYBg7PV7kW6NBygyTYGohl4EpRqhP/tLJRT55mdO0k
+            bBugUevjb+49OIZbgB8Y6aPXeHzIdYvtYan3KuGozDhu75k12pGoAAP5hKb8aFzF
+            zt0bQOw1lcZEqrZaPb0Io9ItOEkaQEUnSHmhBRh7vERH4/pZOA0TYCPVpRbLPheq
+            34gdtOvrPxXyBUSK9zTKG0gUoWz+QtzLSS1UXVDsX5l8Aux04zBBSm+2x3lN7Utb
+            oeDETVWaxeFgfF/AIACUOlrE33jltgbp/zL9/j4V3b1Hd/LGHPC7+cM7K3bHv8RE
+            q8TX3SnxAoGBAOeki/q08bcw9Md2heJxD8+93ze+Q0uEPO90h6jua8FYxJa/UzxL
+            rHYIrDWu4EyO3v6PeWC1+WqYhdldQnsCPObh6Bf5irUeEY59hsEldLGqwnnGAnTf
+            X3vZtnMfksqsqBQxq9ICK7JjYLVWEKjQizTtDeJijhfhNSaQ/4ACyPnfAoGBAMuN
+            Iw81whxMCqBKMFjQtKFHJVHNc8jxv9vkigPlzIeMHZUSOf8mcdC8/nr8izmIxTGf
+            pQdoCcfK1CqiZFvGbebzWV9fzBgtrf9sC03g87UbgWgzhv7nwCRrfQnJbI1dZ+F9
+            9qWdEDLD9fUFim/5wYgF25sPJkvBUb12E+3S5k6DAoGBANOFSd0QxXgGWD6bV/5C
+            R7HnK6F3N3QJuKrfudDkhbj0Ge+dnZ/9aeoOWVJb8a12+OFymd9Zy/suc2rc4gv5
+            KyuZNZpO3/4rCtUWgqp0TW6/Av63dR7LqiEp2JSfTCeOKZznDoKiQMyQOorboDLG
+            25bksDz8ycu8dhBVbzmxUVv5AoGAftqvjcwX8+CkAq8ZoFA5MgWPyYI79XBL/HNa
+            XAF7zMHSsdORF2VTKx6NjgITlkCZfEqc45e/+KZ8QTHBT7zDQ1pHSXv/StY1COjB
+            xsA5wZWpuVHbgMLXaRsf6th/8T3T/qCs9RuEO88KWrAgTZaeOPJFoUX4vN923JdY
+            5i84XpcCgYEAta50oiS58Aob0CS8yb2rZ2B4+xNcW7CQ7jPovCWdbo3n2is0UPO6
+            KMVW4V2nEpWgGGBV51CdW0V8HSthBDGTAFVUAInR0YvpFEqh0UpUNlkDlq9lc15/
+            OUOiyoA5ix/gHO7sCiUttoIDxP9TEhbh/s7grjGrx2by7fKqLspJNco=
+            -----END RSA PRIVATE KEY-----
+          script: |
+            # Sourcing profile/bashrc/NVM to load Node and npm into non-interactive path
+            [ -f "$HOME/.profile" ] && source "$HOME/.profile"
+            [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
+            node -v
+            npm -v
+
+            set -e
+
+            echo "═══ Deploying GAMH Backend ═══"
+
+            # Navigate to app directory
+            cd ${{ env.APP_DIR }}
+
+            # Pull latest code
+            echo "[1/4] Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install production dependencies
+            echo "[2/4] Installing dependencies..."
+            npm ci --omit=dev
+
+            # Ensure .env exists
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file missing on server!"
+              exit 1
+            fi
+
+            # Restart the service via PM2
+            echo "[3/4] Restarting service via PM2..."
+            pm2 restart ${{ env.SERVICE_NAME }} || pm2 start server.js --name "${{ env.SERVICE_NAME }}"
+            pm2 save
+
+            # Wait and verify
+            echo "[4/4] Verifying deployment..."
+            sleep 3
+            if pm2 describe "${{ env.SERVICE_NAME }}" >/dev/null; then
+              echo "✅ Deployment successful! Service is running in PM2."
+              pm2 status
+            else
+              echo "❌ Service failed to start in PM2!"
+              pm2 logs ${{ env.SERVICE_NAME }} --lines 20 --no-daemon
+              exit 1
+            fi
+
+            # Quick health check
+            sleep 2
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/health || echo "000")
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ Health check passed (HTTP $HTTP_STATUS)"
+            else
+              echo "⚠️  Health check returned HTTP $HTTP_STATUS"
+            fi
